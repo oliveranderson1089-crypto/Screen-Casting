@@ -5,7 +5,7 @@
 #   phone-cast.sh          自动选择：优先 USB，没插线就走无线
 #   phone-cast.sh usb      强制走 USB
 #   phone-cast.sh wifi     强制走无线（记录的 IP 连不上会自动扫网段找）
-#   phone-cast.sh desktop  开独立虚拟屏（电脑上一块独立 Android 桌面，手机主屏可休眠省电，非镜像）
+#   phone-cast.sh desktop [包名]  开独立虚拟屏并在里面打开一个应用（不给包名则弹框选；手机主屏可休眠省电，非镜像）
 #   phone-cast.sh setup    插着 USB 线跑一次，重新打通无线（手机重启后需要）
 #   phone-cast.sh find     只搜索手机、更新 IP 记录，不启动投屏
 #   phone-cast.sh off      断开无线连接
@@ -15,6 +15,9 @@ PORT=5555
 STATE_DIR="$HOME/AppStore/data/phone-cast"
 IP_FILE="$STATE_DIR/last-ip"
 SERIAL_FILE="$STATE_DIR/serial"   # 手机硬件序列号，用来确认扫到的是自己的设备
+APP_FILE="$STATE_DIR/last-app"    # 独立桌面上次打开的应用，方便下次
+DESKTOP_APP=""                    # 命令行 `desktop <包名>` 指定的应用
+CHOSEN_APP=""                     # choose_app 选定的结果
 
 # 无线带宽有限，码率给低一点；USB 不心疼带宽
 BITRATE_WIFI="12M"
@@ -170,21 +173,58 @@ launch() {
   fi
 }
 
-# 独立虚拟屏（--new-display）：在电脑上开一块独立的 Android 桌面。
-# 和镜像的区别——手机主屏完全不受影响，可以正常锁屏、休眠、真省电，
-# 这正是虚拟屏的意义，所以这里不带 --turn-screen-off / --stay-awake。
-# 关闭窗口时虚拟屏销毁（默认行为），手机主屏照旧。
-# 这台 vivo 的辅助屏用系统自带 SecondaryDisplayLauncher，开箱就是可用的桌面。
+# 选一个要在独立桌面打开的应用 → 存入 CHOSEN_APP（空=不指定）。
+# 用户在选择框点取消则退出整个脚本。--list-apps 的列表输出在 stderr，故用 2>&1。
+choose_app() {
+  local serial="$1"
+  # 命令行 `desktop <包名>` 已指定，直接用
+  if [[ -n "$DESKTOP_APP" ]]; then CHOSEN_APP="$DESKTOP_APP"; return; fi
+  # 没有 zenity（纯命令行环境）：沿用上次记录的应用
+  if ! command -v zenity >/dev/null 2>&1; then
+    [[ -f "$APP_FILE" ]] && CHOSEN_APP="$(cat "$APP_FILE")"
+    return
+  fi
+  # 弹列表让用户选（显示应用名，返回包名）
+  local last=""; [[ -f "$APP_FILE" ]] && last="$(cat "$APP_FILE")"
+  note "正在读取手机应用列表…（稍等几秒）"
+  local rows
+  rows="$(scrcpy -s "$serial" --list-apps 2>&1 | awk '
+    /^[[:space:]]*[*-][[:space:]]/ {
+      pkg=$NF; $1=""; $NF="";
+      name=$0; gsub(/^[ \t]+|[ \t]+$/, "", name);
+      if (name != "") { print name; print pkg }
+    }')" || true
+  if [[ -z "$rows" ]]; then CHOSEN_APP=""; return; fi   # 列不出来就退回系统辅助桌面
+  local sel
+  sel="$(printf '%s\n' "$rows" | zenity --list \
+      --title="独立桌面" \
+      --text="选一个要在独立桌面打开的应用（上次：${last:-无}）" \
+      --column="应用" --column="pkg" --print-column=2 --hide-column=2 \
+      --width=380 --height=560 2>/dev/null)" \
+    || { note "已取消"; exit 0; }
+  CHOSEN_APP="$sel"
+}
+
+# 独立虚拟屏（--new-display）：在电脑上开一块独立的 Android 桌面。手机主屏完全不受
+# 影响、可正常锁屏休眠省电——所以不带 --turn-screen-off / --stay-awake。关闭窗口时
+# 虚拟屏销毁，手机主屏照旧。
+# vivo 的辅助屏 launcher（SecondaryDisplayLauncher）时有时无、常是白板，所以这里用
+# --start-app 明确打开一个应用（由 choose_app 选出），稳定可用。
 #
 # ⚠ 无线模式的前提：手机深度休眠会断开 WiFi，连带掐断本会话（本机实测）。
 # 人在旁边短时用没问题；要「挂个应用长跑」离开，建议插 USB（USB 下休眠不断连）。
 start_desktop() {
   local serial="$1" bitrate="$2"
-  echo "==> 独立桌面：$serial"
-  echo "    这是一块独立虚拟屏，手机主屏可以正常锁屏休眠省电"
+  choose_app "$serial"
+  [[ -n "$CHOSEN_APP" ]] && echo "$CHOSEN_APP" > "$APP_FILE"
+  echo "==> 独立桌面：$serial（${CHOSEN_APP:-系统桌面}）"
+  echo "    手机主屏可正常锁屏休眠省电"
+  local extra=()
+  [[ -n "$CHOSEN_APP" ]] && extra=(--start-app="$CHOSEN_APP")
   exec scrcpy -s "$serial" \
     --window-title="vivo 独立桌面" \
     --new-display \
+    "${extra[@]}" \
     --video-bit-rate="$bitrate" \
     --max-fps=60
 }
@@ -263,6 +303,7 @@ case "${1:-auto}" in
     ;;
   desktop)
     LAUNCH_MODE=desktop
+    DESKTOP_APP="${2:-}"
     connect_auto
     ;;
   auto)
