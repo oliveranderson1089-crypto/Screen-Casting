@@ -173,6 +173,9 @@ launch() {
 # 这正是虚拟屏的意义，所以这里不带 --turn-screen-off / --stay-awake。
 # 关闭窗口时虚拟屏销毁（默认行为），手机主屏照旧。
 # 这台 vivo 的辅助屏用系统自带 SecondaryDisplayLauncher，开箱就是可用的桌面。
+#
+# ⚠ 无线模式的前提：手机深度休眠会断开 WiFi，连带掐断本会话（本机实测）。
+# 人在旁边短时用没问题；要「挂个应用长跑」离开，建议插 USB（USB 下休眠不断连）。
 start_desktop() {
   local serial="$1" bitrate="$2"
   echo "==> 独立桌面：$serial"
@@ -232,6 +235,15 @@ connect_usb() {
   launch "$serial" "$BITRATE_USB" "vivo 投屏（USB）"
 }
 
+# 自动选设备：优先 USB，没插线走无线。auto 和 desktop 共用同一套选择逻辑。
+connect_auto() {
+  if [[ -n "$(usb_serial)" ]]; then
+    connect_usb
+  else
+    connect_wifi
+  fi
+}
+
 case "${1:-auto}" in
   usb)   connect_usb ;;
   wifi)  connect_wifi ;;
@@ -249,22 +261,14 @@ case "${1:-auto}" in
     ;;
   desktop)
     LAUNCH_MODE=desktop
-    if [[ -n "$(usb_serial)" ]]; then
-      connect_usb
-    else
-      connect_wifi
-    fi
+    connect_auto
     ;;
   auto)
-    if [[ -n "$(usb_serial)" ]]; then
-      connect_usb
-    else
-      connect_wifi
-    fi
+    connect_auto
     ;;
   *)
     echo "未知参数：$1" >&2
-    sed -n '2,12p' "$0" >&2
+    sed -n '2,11p' "$0" >&2
     exit 1
     ;;
 esac
