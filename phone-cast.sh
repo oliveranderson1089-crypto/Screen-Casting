@@ -143,6 +143,9 @@ find_phone() {
 # 保留是为了将来万一开了「USB调试(安全设置)」解锁写权限，无需再改脚本。
 SCREEN_TIMEOUT=7200
 
+# 特意不用 --stay-awake：它设的是「充电时屏幕常亮」(STAY_ON_WHILE_PLUGGED_IN)。
+# USB 连接=充电，会把 -S 的关屏顶亮，导致有线时手机屏幕关不掉；无线不充电才没这问题。
+# 它也防不住无线深睡断连（不充电时该设置根本不生效）——所以直接不用，USB/无线都靠 -S 关屏。
 start_scrcpy() {
   local serial="$1" bitrate="$2" title="$3"
   echo "==> 投屏中：$serial（$title）"
@@ -152,7 +155,6 @@ start_scrcpy() {
     --video-bit-rate="$bitrate" \
     --max-fps=60 \
     --turn-screen-off \
-    --stay-awake \
     --screen-off-timeout="$SCREEN_TIMEOUT" \
     --power-off-on-close
 }
