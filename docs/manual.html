@@ -461,6 +461,10 @@
             <td>强制走无线，码率 12M。记录的 IP 连不上会<b class="hl">自动扫网段找手机</b></td>
           </tr>
           <tr>
+            <td><code>phone-cast.sh desktop</code></td>
+            <td><b class="hl">独立桌面模式</b>：电脑上开一块独立 Android 桌面，手机主屏可休眠省电（非镜像）</td>
+          </tr>
+          <tr>
             <td><code>phone-cast.sh find</code></td>
             <td>只扫描、更新 IP 记录，不启动投屏。想手动刷新地址时用</td>
           </tr>
@@ -480,6 +484,53 @@
       <p>
         脚本已默认带上关屏参数：<b>启动即关闭手机屏幕</b>，省电、防偷看，
         电脑这边照常显示和操作。想让手机屏幕亮起来按 <kbd>Alt</kbd><span class="plus">+</span><kbd>Shift</kbd><span class="plus">+</span><kbd>O</kbd>。
+      </p>
+    </div>
+  </section>
+
+  <!-- ============ 两种模式 ============ -->
+  <section>
+    <h2>两种模式 <small>镜像 / 独立桌面</small></h2>
+    <p class="dim">
+      默认是<b>镜像</b>——电脑上看到手机当前界面。另有一个可选的<b>独立桌面</b>模式，
+      右键图标选「独立桌面」或跑 <code>phone-cast.sh desktop</code>。两者互不影响，随时切换。
+    </p>
+
+    <div class="cmd-scroll">
+      <table class="cmds">
+        <thead>
+          <tr><th>对比</th><th>镜像（默认）</th><th>独立桌面（desktop）</th></tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>电脑上看到</td>
+            <td>手机当前界面</td>
+            <td>一块<b class="hl">独立</b>的 Android 桌面</td>
+          </tr>
+          <tr>
+            <td>手机主屏</td>
+            <td>关闭省电，但系统保持唤醒</td>
+            <td>可正常锁屏、休眠，<b class="hl">真省电</b></td>
+          </tr>
+          <tr>
+            <td>手感</td>
+            <td>和手机同步，来电消息都在眼前</td>
+            <td>像多开一台设备，手机各干各的</td>
+          </tr>
+          <tr>
+            <td>适合</td>
+            <td>日常操控、演示</td>
+            <td>挂个应用长跑、不想占用手机</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div class="panel panel--note">
+      <p>
+        独立桌面靠 <code>--new-display</code> 开一块虚拟屏，需要 Android 11+（越新支持越好）。
+        这台设备用系统自带的辅助屏桌面，开箱可用。关闭窗口时虚拟屏销毁，手机主屏不受影响。
+        窗口里的快捷键和镜像模式完全一样。
       </p>
     </div>
   </section>

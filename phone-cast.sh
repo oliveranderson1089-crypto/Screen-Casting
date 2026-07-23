@@ -5,6 +5,7 @@
 #   phone-cast.sh          自动选择：优先 USB，没插线就走无线
 #   phone-cast.sh usb      强制走 USB
 #   phone-cast.sh wifi     强制走无线（记录的 IP 连不上会自动扫网段找）
+#   phone-cast.sh desktop  开独立虚拟屏（电脑上一块独立 Android 桌面，手机主屏可休眠省电，非镜像）
 #   phone-cast.sh setup    插着 USB 线跑一次，重新打通无线（手机重启后需要）
 #   phone-cast.sh find     只搜索手机、更新 IP 记录，不启动投屏
 #   phone-cast.sh off      断开无线连接
@@ -156,6 +157,33 @@ start_scrcpy() {
     --power-off-on-close
 }
 
+# 把解析好的设备交给对应的启动函数。默认镜像模式（现有行为，一字不变）；
+# LAUNCH_MODE=desktop 时改开独立虚拟屏。这样 desktop 模式能白捡现有的
+# USB/无线/自动扫描连接逻辑，无需复制代码，也不动镜像那条路径。
+launch() {
+  if [[ "${LAUNCH_MODE:-mirror}" == "desktop" ]]; then
+    start_desktop "$1" "$2"
+  else
+    start_scrcpy "$1" "$2" "$3"
+  fi
+}
+
+# 独立虚拟屏（--new-display）：在电脑上开一块独立的 Android 桌面。
+# 和镜像的区别——手机主屏完全不受影响，可以正常锁屏、休眠、真省电，
+# 这正是虚拟屏的意义，所以这里不带 --turn-screen-off / --stay-awake。
+# 关闭窗口时虚拟屏销毁（默认行为），手机主屏照旧。
+# 这台 vivo 的辅助屏用系统自带 SecondaryDisplayLauncher，开箱就是可用的桌面。
+start_desktop() {
+  local serial="$1" bitrate="$2"
+  echo "==> 独立桌面：$serial"
+  echo "    这是一块独立虚拟屏，手机主屏可以正常锁屏休眠省电"
+  exec scrcpy -s "$serial" \
+    --window-title="vivo 独立桌面" \
+    --new-display \
+    --video-bit-rate="$bitrate" \
+    --max-fps=60
+}
+
 # ---- 打通无线：需要 USB 线在位 ----
 setup_wifi() {
   local serial ip hw
@@ -181,7 +209,7 @@ connect_wifi() {
 
   # 1) 记录的 IP 还通就直接用
   if [[ -n "$ip" ]] && try_connect "$ip"; then
-    start_scrcpy "$ip:$PORT" "$BITRATE_WIFI" "vivo 投屏（无线）"
+    launch "$ip:$PORT" "$BITRATE_WIFI" "vivo 投屏（无线）"
   fi
 
   # 2) 不通就在当前网段里找（换了 WiFi、开了热点都属于这种）
@@ -191,7 +219,7 @@ connect_wifi() {
   local found
   if found="$(find_phone)"; then
     note "找到了：$found"
-    start_scrcpy "$found:$PORT" "$BITRATE_WIFI" "vivo 投屏（无线）"
+    launch "$found:$PORT" "$BITRATE_WIFI" "vivo 投屏（无线）"
   fi
 
   die "在当前网段没找到手机。请依次排查：\n\n1) 先点亮手机屏幕——手机深度休眠时 WiFi 会断，端口扫不到（最常见）\n2) 手机和电脑连的是同一个 WiFi（或电脑连了手机热点）\n3) 手机没有重启过——重启会关掉无线调试，需插 USB 线选「重新打通无线」\n4) 路由器没开「AP 隔离 / 客户端隔离」"
@@ -201,7 +229,7 @@ connect_usb() {
   local serial
   serial="$(usb_serial)"
   [[ -n "$serial" ]] || die "没检测到 USB 设备。\n请插上数据线，并把 USB 用途设为「管理文件」。"
-  start_scrcpy "$serial" "$BITRATE_USB" "vivo 投屏（USB）"
+  launch "$serial" "$BITRATE_USB" "vivo 投屏（USB）"
 }
 
 case "${1:-auto}" in
@@ -218,6 +246,14 @@ case "${1:-auto}" in
   off)
     adb disconnect >/dev/null 2>&1 || true
     note "已断开所有无线 adb 连接。"
+    ;;
+  desktop)
+    LAUNCH_MODE=desktop
+    if [[ -n "$(usb_serial)" ]]; then
+      connect_usb
+    else
+      connect_wifi
+    fi
     ;;
   auto)
     if [[ -n "$(usb_serial)" ]]; then

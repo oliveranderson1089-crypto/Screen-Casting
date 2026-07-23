@@ -28,7 +28,7 @@ Terminal=false
 Categories=Utility;Network;RemoteAccess;
 Keywords=scrcpy;phone;mirror;android;投屏;手机;touping;
 StartupNotify=true
-Actions=usb;wifi;setup;off;
+Actions=usb;wifi;desktop;setup;off;
 
 [Desktop Action usb]
 Name=USB 投屏（画质最好）
@@ -37,6 +37,10 @@ Exec=$SCRIPT usb
 [Desktop Action wifi]
 Name=无线投屏
 Exec=$SCRIPT wifi
+
+[Desktop Action desktop]
+Name=独立桌面（手机主屏可休眠）
+Exec=$SCRIPT desktop
 
 [Desktop Action setup]
 Name=重新打通无线（需插线）
